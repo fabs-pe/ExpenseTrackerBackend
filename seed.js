@@ -1,105 +1,110 @@
+// seed.js - Complete working version for your exact Supabase schema
 require('dotenv').config();
-const mongoose = require('mongoose');
+const { Pool } = require('pg');
 
-const { databaseConnect } = require('./src/database');
-const { Expense } = require('./src/models/ExpensesModel');
-const { Category } = require('./src/models/categoryModel');
-const { User } = require('./src/models/UserModel');
+const pool = new Pool({
+  connectionString: process.env.SUPABASE_DB_URL,
+  ssl: { rejectUnauthorized: false },
+});
 
 async function seed() {
+  const client = await pool.connect();
+  
   try {
-    await databaseConnect();
+    console.log('🔌 Connecting to Supabase...');
+    await client.query('BEGIN');
 
-    // Clear existing data
-    await User.deleteMany({});
-    await Category.deleteMany({});
-    await Expense.deleteMany({});
+    // 1. Clear existing data (in FK-safe order)
+    await client.query('DELETE FROM expenses;');
+    await client.query('DELETE FROM categories;');
+    await client.query('DELETE FROM users;');
 
-    // Create multiple users in one go
-    const users = await User.insertMany([
-      {
-        userName: "Fabian",
-        email: "fabian@email.com",
-        password: "password13",
-        groupName: "devgroup12e"
-      },
-      {
-        userName: "Alice",
-        email: "alice@email.com",
-        password: "password42",
-        groupName: "devgroup12e",
-        role: "adult"
-      },
-      {
-        userName: "Matisse",
-        email: "matisse@email.com",
-        password: "password13",
-        groupName: "9888112e",
-        role: "adult"
-      }
-    ]);
+    // 2. Insert USERS (matches your users table: created_at, user_name, email, password, group_name, role)
+    const now = new Date().toISOString();
+    const insertUsersText = `
+      INSERT INTO users (created_at, user_name, email, password, group_name, role)
+      VALUES 
+        ($1, $2, $3, $4, $5, $6),
+        ($7, $8, $9, $10, $11, $12),
+        ($13, $14, $15, $16, $17, $18)
+      RETURNING id;
+    `;
+    
+    const usersValues = [
+      now, 'Fabian', 'fabian@email.com', 'password13', 'devgroup12e', null,
+      now, 'Alice', 'alice@email.com', 'password42', 'devgroup12e', 'adult',
+      now, 'Matisse', 'matisse@email.com', 'password13', '9888112e', 'adult',
+    ];
 
-    // Create categories
-    const categories = await Category.insertMany([
-      {
-        categoryName: "Car",
-        categoryDesc: "All car expenses"
-      },
-      {
-        categoryName: "Groceries",
-        categoryDesc: "all food and beverage bought from shops"
-      },
-      {
-        categoryName: "entertainment",
-        categoryDesc:"going out not including restaurants"
-      },
-      {
-        categoryName: "Alcohol",
-        categoryDesc:" from the"
-      }
-    ]);
+    const { rows: userRows } = await client.query(insertUsersText, usersValues);
+    const fabianId = userRows[0].id;
+    const aliceId = userRows[1].id;
+    const matisseId = userRows[2].id;
+    console.log('✅ Users seeded:', userRows.map(u => u.id));
 
-    // Create expense linked to  users + categories
-    const expenses = await Expense.insertMany([
-      {
-        user: users[0]._id,
-        category: categories[0]._id,
-        expenseName: "Petrol",
-        description: "Petrol to school",
-        amount: 45,
-        date: new Date("2025-04-12") // better to store dates properly
-      },
-      {
-        user: users[1]._id,
-        category: categories[1]._id,
-        expenseName: "Food",
-        description: "food for dinner on tueday",
-        amount: 100,
-        date: new Date("2025-01-02")
-      },
-      {
-        user: users[0]._id,
-        category: categories[1]._id,
-        expenseName: "Lunch Food",
-        description: "Food for the week lunches",
-        amount: "150",
-        date: new Date("2025-03-13")
-      },
-      {
-        user: users[2]._id,
-        category: categories[3]._id,
-        expenseName: "Long Weekend",
-        description: "all beverages for the weekend",
-        amount: 400,
-        date: new Date("2025-01-02")
-      }
-    ]);
+    // 3. Insert CATEGORIES (matches your categories table: created_at, category_name, category_desc)
+    const insertCategoriesText = `
+      INSERT INTO categories (created_at, category_name, category_desc)
+      VALUES 
+        ($1, $2, $3),
+        ($4, $5, $6),
+        ($7, $8, $9),
+        ($10, $11, $12)
+      RETURNING cat_id;
+    `;
+    
+    const categoriesValues = [
+      now, 'Car', 'All car expenses',
+      now, 'Groceries', 'all food and beverage bought from shops',
+      now, 'entertainment', 'going out not including restaurants',
+      now, 'Alcohol', ' from the',
+    ];
 
-    console.log("✅ Database seeded successfully!");
+    const { rows: categoryRows } = await client.query(insertCategoriesText, categoriesValues);
+    const carId = categoryRows[0].cat_id;
+    const groceriesId = categoryRows[1].cat_id;
+    const entertainmentId = categoryRows[2].cat_id;
+    const alcoholId = categoryRows[3].cat_id;
+    console.log('✅ Categories seeded:', categoryRows.map(c => c.cat_id));
+
+    // 4. Insert EXPENSES (matches your expenses table)
+    // NOTE: Change user_id column to 'bigint' first in Supabase (not array)
+ const insertExpensesText = `
+  INSERT INTO expenses (cat_id, expense_name, description, amount, date, user_id)
+  VALUES 
+    ($1, $2, $3, $4, $5, $6),
+    ($7, $8, $9, $10, $11, $12),
+    ($13, $14, $15, $16, $17, $18),
+    ($19, $20, $21, $22, $23, $24);
+`;
+
+const expensesValues = [
+  // Petrol - user_id as ARRAY['80']
+  carId, 'Petrol', 'Petrol to school', 45, '2025-04-12T00:00:00Z', [`${fabianId}`],
+  
+  // Food
+  groceriesId, 'Food', 'food for dinner on tueday', 100, '2025-01-02T00:00:00Z', [`${aliceId}`],
+  
+  // Lunch Food
+  groceriesId, 'Lunch Food', 'Food for the week lunches', 150, '2025-03-13T00:00:00Z', [`${fabianId}`],
+  
+  // Long Weekend
+  alcoholId, 'Long Weekend', 'all beverages for the weekend', 400, '2025-01-02T00:00:00Z', [`${matisseId}`],
+];
+
+await client.query(insertExpensesText, expensesValues);
+console.log('✅ Expenses seeded');
+
+    await client.query('COMMIT');
+    console.log('🎉 Database fully seeded!');
+    
   } catch (err) {
-    console.error("❌ Error seeding database:", err);
+    await client.query('ROLLBACK');
+    console.error('❌ Seed failed:', err.message);
+    console.error('Full error:', err);
   } finally {
-    mongoose.connection.close();
+    client.release();
+    await pool.end();
   }
 }
 
