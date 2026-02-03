@@ -82,6 +82,35 @@ router.post('/add', async (req, res) => {
 // GET expenses. by ID (with user join)
 // ==========================
 
+router.get('/:id', async (req, res) => {
+  try{
+    const { id } = req.params;
+    
+    if (isNaN(id) || id <=0){
+      return res.status(400).json({message: 'Invalid expense ID' });
+    }
+
+    const results = await pool.query(`
+      SELECT e.id, e.cat_id, e.expense_name, e.description, e.amount, e.date, e.user_id, c.category_name, u.user_name, u.email
+      FROM expenses e
+      LEFT JOIN categories c ON e.cat_id = c.cat_id
+      LEFT JOIN users u ON e.user_id[1]::text = u.id::text
+      WHERE e.id = $1`,[id]);
+
+    if (results.rows.length === 0) {
+      return res.status(404).json({message: 'Expense not found' });
+    }
+
+    res.json({
+      message: 'Expense found',
+      expense: results.rows[0]
+    });
+  
+  } catch (err) {
+    console.error('Get expense error:', err);
+  }
+})
+
 // const count = await pool.query('SELECT COUNT(*) as total FROM expenses');
 // const sample = await pool.query('SELECT * FROM expenses LIMIT 1');
 
