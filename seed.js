@@ -67,8 +67,7 @@ async function seed() {
     const alcoholId = categoryRows[3].cat_id;
     console.log('✅ Categories seeded:', categoryRows.map(c => c.cat_id));
 
-    // 4. Insert EXPENSES (matches your expenses table)
-    // NOTE: Change user_id column to 'bigint' first in Supabase (not array)
+    // Insert EXPENSES (matches expenses table)
  const insertExpensesText = `
   INSERT INTO expenses (cat_id, expense_name, description, amount, date, user_id)
   VALUES 
@@ -80,16 +79,16 @@ async function seed() {
 
 const expensesValues = [
   // Petrol - user_id as ARRAY['80']
-  carId, 'Petrol', 'Petrol to school', 45, '2025-04-12T00:00:00Z', [`${fabianId}`],
+  carId, 'Petrol', 'Petrol to school', 45, '2025-04-12T00:00:00Z', `${fabianId}`,
   
   // Food
-  groceriesId, 'Food', 'food for dinner on tueday', 100, '2025-01-02T00:00:00Z', [`${aliceId}`],
+  groceriesId, 'Food', 'food for dinner on tueday', 100, '2025-01-02T00:00:00Z', `${aliceId}`,
   
   // Lunch Food
-  groceriesId, 'Lunch Food', 'Food for the week lunches', 150, '2025-03-13T00:00:00Z', [`${fabianId}`],
+  groceriesId, 'Lunch Food', 'Food for the week lunches', 150, '2025-03-13T00:00:00Z', `${fabianId}`,
   
   // Long Weekend
-  alcoholId, 'Long Weekend', 'all beverages for the weekend', 400, '2025-01-02T00:00:00Z', [`${matisseId}`],
+  alcoholId, 'Long Weekend', 'all beverages for the weekend', 400, '2025-01-02T00:00:00Z', `${matisseId}`,
 ];
 
 await client.query(insertExpensesText, expensesValues);

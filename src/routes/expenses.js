@@ -17,7 +17,7 @@ router.get('/', async (req, res) => {
     const results = await pool.query(`
       SELECT e.*, u.user_name, u.email 
       FROM expenses e 
-      LEFT JOIN users u ON e.user_id[1]::text = u.id::text
+      LEFT JOIN users u ON e.user_id = u.id
     `);
     
     res.json({ 
@@ -60,7 +60,7 @@ router.post('/add', async (req, res) => {
         u.user_name, u.email
       FROM expenses e
       LEFT JOIN categories c ON e.cat_id = c.cat_id
-      LEFT JOIN users u ON e.user_id[1]::text = u.id::text
+      LEFT JOIN users u ON e.user_id = u.id
       WHERE e.id = $1;
     `;
     
@@ -94,7 +94,7 @@ router.get('/:id', async (req, res) => {
       SELECT e.id, e.cat_id, e.expense_name, e.description, e.amount, e.date, e.user_id, c.category_name, u.user_name, u.email
       FROM expenses e
       LEFT JOIN categories c ON e.cat_id = c.cat_id
-      LEFT JOIN users u ON e.user_id[1]::text = u.id::text
+      LEFT JOIN users u ON e.user_id = u.id
       WHERE e.id = $1`,[id]);
 
     if (results.rows.length === 0) {
