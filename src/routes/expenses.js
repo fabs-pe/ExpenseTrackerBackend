@@ -111,6 +111,43 @@ router.get('/:id', async (req, res) => {
   }
 })
 
+// ==========================
+// GET expenses. by date
+// ==========================
+
+router.get('/date/:start/:end', async (req,res) => {
+  try{
+    const { start, end } = req.params;
+
+    // date format YYYY-MM-DD
+    const startDate = `${start}T00:00:00Z`;
+    const endDate = `${end}T23:59:59Z`;
+
+    const results = await pool.query(`
+      SELECT
+      e.id, e.cat_id, e.expense_name, e.description, e.amount, e.date,e.user_id,
+      c.category_name,
+      u.user_name
+      FROM expenses e
+      LEFT JOIN categories c ON e.cat_id = c.cat_id
+      LEFT JOIN users u ON e.user_id = u.id
+      WHERE e.date >= $1 AND e.date <= $2
+      ORDER BY e.date DESC
+      `, [startDate, endDate]);
+
+    res.json({
+      message: `Expenses ${start} to ${end}`,
+      count: results.rows.length,
+      expenses: results.rows
+    });
+
+  } catch (err) {
+    console.error('Date expenses error:' , err);
+    res.status(500).json({error: err.message});
+  }
+})
+
+
 // const count = await pool.query('SELECT COUNT(*) as total FROM expenses');
 // const sample = await pool.query('SELECT * FROM expenses LIMIT 1');
 
