@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { Pool } = require('pg');
+const bcrypt = require('bcrypt'); 
 
 //  CREATE POOL HERE
 const pool = new Pool({
@@ -77,7 +78,7 @@ router.get('/name/:user_name', async (req, res) => {
     const results = await pool.query(`
       SELECT u.*
       FROM users u
-      WHERE u.user_name = $1`, [user_name]);
+      WHERE LOWER (u.user_name) = LOWER ($1)`, [user_name]);
 
       if (results.rows.length === 0 ){
         return res.status(404).json({message: 'User Name Not Found'});
@@ -85,7 +86,7 @@ router.get('/name/:user_name', async (req, res) => {
 
       res.json({
         message: 'User Found',
-        user: results.rows[0]
+        user: results.rows
       })
  
 
@@ -96,6 +97,32 @@ router.get('/name/:user_name', async (req, res) => {
 
 });
 
+// GET users by group name
+router.get('/group/:group_name', async (req, res) => {
+  try{
+
+    const { group_name } = req.params
+    
+    const results = await pool.query(`
+      SELECT u.*
+      FROM users u 
+      WHERE LOWER (u.group_name) = LOWER ($1)`, [group_name]);
+
+    if (results.rows.length === 0){
+      return res.status(404).json({message: 'Group Name out found'});
+    }
+
+    res.json({
+      message: 'Group Found',
+      group_name: results.rows
+    })
+  
+  }catch(err){
+    console.error('Get Group error:', err);
+    res.status(500).json({error: err.message})
+  }
+  
+});
 
 // // GET user by email
 // // add permissions
@@ -110,60 +137,106 @@ router.get('/name/:user_name', async (req, res) => {
 // ||||||||||||||||||||||
 
 //  POST create new user
-router.post("/register", async (request, response) =>{
+router.post("/register", async (req, res) =>{
     try{
-        let newUser = await User.create(request.body)
-        response.status(201).json({message: 'User registered successfully!'});
+      const { user_name, email, password, group_name, role } = req.body;
 
-        response.json({user: newUser});
+      // basic validation
+      if (!user_name || !email || !password){
+        return res.status(400).json({
+          message: 'user_name, email and password are required',
+        })
+      }
+
+      // check if email already exists
+      const existing = await pool.query(
+        'SELECT id FROM users WHERE email = $1', [email]
+      );
+      if (existing.rows.length > 0) {
+        return res.status(409).json({ message: 'Email already registered'})
+      }
+
+      // Hash password
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      // Insert user
+      const insertText = `
+        INSERT INTO users (created_at, user_name, email, password, group_name, role)
+        VALUES (NOW(), $1, $2, $3, $4, $5)
+        RETURNING id, created_at, user_name, email, group_name, role;  
+      `;
+
+      const values = [
+        user_name,
+        email,
+        hashedPassword,
+        group_name || null,
+        role || null,
+      ];
+
+      const result = await pool.query(insertText, values);
+      const user = result.rows[0];
+
+      return res.status(201).json({
+        message: "User created",
+        user,
+      });
+
     } catch (err){
-        response.status(500).json({message: "An error occured during the registering User", error: err.message});
-
+        console.error('Create user error:', err);
+        return res.status(500).json({
+          message: 'Error creating user',
+          error: err.message,
+        });
+       
     }
 });
 
 // POST to users/login
 router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
 
   try {
-    // Check for missing fields
-    if (!email || !password) {
-      return res.status(400).json({ message: 'Email and password are required' });
+    const { email, password } = req.body;
+
+    // validation
+    if(!email || !password ){
+      return res.status(400).json({message: 'Email and password are required'});
     }
 
-    // Find user by email
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(401).json({ message: 'Invalid email or password' });
-    }
-
-    // Compare password (you had a small typo here)
-    const passwordMatch = await bcrypt.compare(password, user.password);
-    if (!passwordMatch) {
-      return res.status(401).json({ message: 'Invalid email or password' });
-    }
-
-    // Generate JWT token
-    const token = jwt.sign(
-      { id: user._id, email: user.email },
-      process.env.WORKER_JWT_KEY, // make sure this exists in .env
-      { expiresIn: '3h' }
+    // find user by email
+    const result = await pool.query(
+      'SELECT id, user_name, email, password, group_name, role FROM users WHERE email = $1',
+      [email]
     );
 
-    // Respond with token + user info
-    res.json({
-      message: 'Login successful',
-      token,
-      user: {
-        id: user._id,
-        userName: user.userName,
-        email: user.email,
-      },
+    if (result.rows.length === 0 ){
+      return req.status(401).json({message: 'Invalid credentials'});
+    }
+
+    const user = result.rows[0];
+
+    // compare password
+    const isMatch = await bcrypt.compare(password, user.password);
+    if(!isMatch) {
+      return res.status(401).json({message: 'Invalid Credentials'});
+    }
+
+    // strip hashed password before res
+    delete user.password;
+
+    return res.status(200).json({
+      message: "Login Successful",
+      user
     });
 
+
   } catch (err) {
-    res.status(500).json({ message: 'Error logging in', error: err.message });
+    console.error('Login error:', err);
+    return res.status(500).json({
+      message: 'Error Logging in',
+      error: err.message
+    });
+
   }
 });
 
