@@ -42,7 +42,7 @@ router.get('/:id', async (req, res) => {
     const { id } = req.params;
 
     if (isNaN(id) || id<=0){
-      return res.status(400).json({message: 'Inavlid User ID '});
+      return res.status(400).json({message: 'Inavalid User ID '});
     }
 
     const results = await pool.query(`
@@ -102,7 +102,7 @@ router.get('/group/:group_name', async (req, res) => {
   try{
 
     const { group_name } = req.params
-    
+
     const results = await pool.query(`
       SELECT u.*
       FROM users u 

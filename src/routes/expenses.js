@@ -9,6 +9,12 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
+
+// ==============================================================
+// GET Routes
+// ==============================================================
+
+
 // ==========================
 // GET all expenses (with user join)
 // ==========================
@@ -30,6 +36,157 @@ router.get('/', async (req, res) => {
   }
 });
 
+
+// ==========================
+// GET expenses. by ID (with user join)
+// ==========================
+
+router.get('/:id', async (req, res) => {
+  try{
+    const { id } = req.params;
+    
+    if (isNaN(id) || id <=0){
+      return res.status(400).json({message: 'Invalid expense ID' });
+    }
+
+    const results = await pool.query(`
+      SELECT e.id, e.cat_id, e.expense_name, e.description, e.amount, e.date, e.user_id, c.category_name, u.user_name, u.email
+      FROM expenses e
+      LEFT JOIN categories c ON e.cat_id = c.cat_id
+      LEFT JOIN users u ON e.user_id = u.id
+      WHERE e.id = $1`,[id]);
+
+    if (results.rows.length === 0) {
+      return res.status(404).json({message: 'Expense not found' });
+    }
+
+    res.json({
+      message: 'Expense found',
+      expense: results.rows[0]
+    });
+  
+  } catch (err) {
+    console.error('Get expense error:', err);
+  }
+})
+
+// ==========================
+// GET expenses by date
+// ==========================
+
+router.get('/date/:start/:end', async (req,res) => {
+  try{
+    const { start, end } = req.params;
+
+    // date format YYYY-MM-DD
+    const startDate = `${start}T00:00:00Z`;
+    const endDate = `${end}T23:59:59Z`;
+
+    const results = await pool.query(`
+      SELECT
+      e.id, e.cat_id, e.expense_name, e.description, e.amount, e.date,e.user_id,
+      c.category_name,
+      u.user_name
+      FROM expenses e
+      LEFT JOIN categories c ON e.cat_id = c.cat_id
+      LEFT JOIN users u ON e.user_id = u.id
+      WHERE e.date >= $1 AND e.date <= $2
+      ORDER BY e.date DESC
+      `, [startDate, endDate]);
+
+    res.json({
+      message: `Expenses ${start} to ${end}`,
+      count: results.rows.length,
+      expenses: results.rows
+    });
+
+  } catch (err) {
+    console.error('Date expenses error:' , err);
+    res.status(500).json({error: err.message});
+  }
+});
+
+// ==========================
+// GET expenses in between two amounts
+// ==========================
+
+router.get('/amounts/:low/:high', async (req, res) => {
+  try {
+
+    const { low, high } = req.params;
+
+    if (isNaN(low, high) || low <=0 || high <=0){
+      return res.status(400).json({message: 'Invalid amount range' });
+    }
+
+    const lowAmount = `${low}`;
+    const highAmount = `${high}`;
+
+    const results = await pool.query(`
+      SELECT
+      e.id, e.cat_id, e.expense_name, e.description, e.amount, e.date,e.user_id,
+      c.category_name,
+      u.user_name
+      FROM expenses e
+      LEFT JOIN categories c ON e.cat_id = c.cat_id
+      LEFT JOIN users u ON e.user_id = u.id
+      WHERE e.amount >= $1 AND e.amount <= $2
+      ORDER BY e.date DESC
+      `, [lowAmount, highAmount]);
+
+    res.json({
+      message: `Expenses between $${lowAmount} to $${highAmount}`,
+      count: results.rows.length,
+      expenses: results.rows
+    });
+
+  } catch (err) {
+    console.error('Amounts expenses error:' , err);
+    res.status(500).json({error: err.message});
+  }
+});
+
+// ==========================
+// GET expenses by amount
+// ==========================
+
+router.get('/amount/:amount', async (req, res) => {
+  try{
+    const { amount } = req.params;
+
+    if (isNaN(amount) || amount <=0){
+      return res.status(400).json({message:'Invalid amount'});
+    }
+
+    const results = await pool.query(`
+      SELECT e.*, u.user_name, u.email 
+      FROM expenses e 
+      LEFT JOIN users u ON e.user_id = u.id
+      WHERE e.amount = $1`, [amount]);
+
+    if (results.rows.length === 0){
+      return res.status(404).json({message: 'No expenses with that amount'})
+    };
+
+    res.json({
+      message: 'Expense Found',
+      expense: results.rows
+    });
+
+  }catch(err){
+    console.error('Get expense error: ', err);
+    res.status(500).json({error: err.message})
+  }
+});
+
+// ==============================================================
+// POST Routes
+// ==============================================================
+
+
+// ==========================
+// POST an expenses
+// ==========================
 
 router.post('/add', async (req, res) => {
   try {
@@ -76,76 +233,6 @@ router.post('/add', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
-
-// ==========================
-// GET expenses. by ID (with user join)
-// ==========================
-
-router.get('/:id', async (req, res) => {
-  try{
-    const { id } = req.params;
-    
-    if (isNaN(id) || id <=0){
-      return res.status(400).json({message: 'Invalid expense ID' });
-    }
-
-    const results = await pool.query(`
-      SELECT e.id, e.cat_id, e.expense_name, e.description, e.amount, e.date, e.user_id, c.category_name, u.user_name, u.email
-      FROM expenses e
-      LEFT JOIN categories c ON e.cat_id = c.cat_id
-      LEFT JOIN users u ON e.user_id = u.id
-      WHERE e.id = $1`,[id]);
-
-    if (results.rows.length === 0) {
-      return res.status(404).json({message: 'Expense not found' });
-    }
-
-    res.json({
-      message: 'Expense found',
-      expense: results.rows[0]
-    });
-  
-  } catch (err) {
-    console.error('Get expense error:', err);
-  }
-})
-
-// ==========================
-// GET expenses. by date
-// ==========================
-
-router.get('/date/:start/:end', async (req,res) => {
-  try{
-    const { start, end } = req.params;
-
-    // date format YYYY-MM-DD
-    const startDate = `${start}T00:00:00Z`;
-    const endDate = `${end}T23:59:59Z`;
-
-    const results = await pool.query(`
-      SELECT
-      e.id, e.cat_id, e.expense_name, e.description, e.amount, e.date,e.user_id,
-      c.category_name,
-      u.user_name
-      FROM expenses e
-      LEFT JOIN categories c ON e.cat_id = c.cat_id
-      LEFT JOIN users u ON e.user_id = u.id
-      WHERE e.date >= $1 AND e.date <= $2
-      ORDER BY e.date DESC
-      `, [startDate, endDate]);
-
-    res.json({
-      message: `Expenses ${start} to ${end}`,
-      count: results.rows.length,
-      expenses: results.rows
-    });
-
-  } catch (err) {
-    console.error('Date expenses error:' , err);
-    res.status(500).json({error: err.message});
-  }
-})
 
 
 // const count = await pool.query('SELECT COUNT(*) as total FROM expenses');
