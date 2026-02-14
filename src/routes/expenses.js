@@ -179,6 +179,42 @@ router.get('/amount/:amount', async (req, res) => {
   }
 });
 
+// ==========================
+// GET expenses by user
+// ==========================
+
+router.get('/user/:user_id', async (req, res) => {
+  try {
+    const { user_id } = req.params;
+    const idNum = Number(user_id);
+
+    if (Number.isNaN(idNum) || idNum <= 0){
+      return res.status(400).json({message: 'Invalid user ID'});
+    }
+
+    const results = await pool.query(`
+      SELECT e.id, e.cat_id, e.expense_name, e.description, e.amount, e.date, e.user_id,
+      c.category_name,
+      u.user_name, u.email
+      FROM expenses e
+      LEFT JOIN categories c ON e.cat_id = c.cat_id
+      LEFT JOIN users u ON e.user_id = u.id
+      WHERE e.user_id = $1
+      ORDER BY e.date DESC
+      `, [idNum]);
+
+    res.json({
+      message: `Expenses for user ${user_id}`,
+      count: results.rows.length,
+      expenses: results.rows,
+    });
+  } catch (err){
+    console.error('User expenses error:', err);
+    res.status(500).json({error: err.message})
+  }
+  
+})
+
 // ==============================================================
 // POST Routes
 // ==============================================================
