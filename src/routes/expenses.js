@@ -215,6 +215,30 @@ router.get('/user/:user_id', async (req, res) => {
   
 })
 
+// ==========================
+// GET expenses by user
+// ==========================
+
+router.get('/all/summary', async (req, res) => {
+  try{
+    const result = await pool.query(`
+      SELECT
+        COUNT(*)::int AS total_count,
+        COALESCE(SUM(amount), 0)::numeric AS total_amount
+      FROM expenses
+      `);
+
+    res.json({
+      message: 'Expenses summary',
+      summary: result.rows[0]
+    });
+  } catch (err) {
+    console.error ('Summary error:', err);
+    res.status(500).json({error: err.message});
+  }
+  
+});
+
 // ==============================================================
 // POST Routes
 // ==============================================================
