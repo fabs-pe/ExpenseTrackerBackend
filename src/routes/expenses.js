@@ -294,9 +294,16 @@ router.post('/add', async (req, res) => {
   }
 });
 
+// ==========================
+// PATCH an expenses
+// ==========================
 
-// const count = await pool.query('SELECT COUNT(*) as total FROM expenses');
-// const sample = await pool.query('SELECT * FROM expenses LIMIT 1');
+
+// ==========================
+// DELETE an expenses
+// ==========================
+
+
 
 
 module.exports = router;
