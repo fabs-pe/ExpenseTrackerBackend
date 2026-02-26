@@ -298,6 +298,54 @@ router.post('/add', async (req, res) => {
 // PATCH an expenses
 // ==========================
 
+router.patch('/edit/:id', async (req, res) => {
+  try{
+    const { id } = req.params;
+    const {cat_id, expense_name, description,amount,date,user_id} = req.body;
+
+    const expenseId = Number(id);
+    if (Number.isNaN(expenseId) || expenseId <= 0) {
+      return res.status(400).json({ message: 'Invalid expense ID'});
+    }
+
+    // Build dynamic SET clause based on provided fields
+    const fields = [];
+    const values = [];
+    let idx = 1;
+
+    if (cat_id !== undefined){
+      fields.push(`cat_id = $${idx++}`);
+      values.push(cat_id);
+    }
+
+    if (expense_name !== undefined){
+      fields.push(`expense_name = $${idx++}`);
+      values.push(expense_name);
+    }
+
+    if (description !== undefined){
+      fields.push(`description = $${idx++}`);
+      values.push(description);
+    }
+
+    if (amount !== undefined) {
+      const numAmount = Number(amount);
+      if (Number.isNaN(numAmount) || numAmount< 0){
+        return res.status(400).json({ message: 'Invalid amount'});
+      }
+      fields.push(`amount = $${idx++}`);
+      values.push(numAmount);
+    }
+
+    
+
+
+  }catch(err){
+
+  }
+  
+});
+
 
 // ==========================
 // DELETE an expenses
