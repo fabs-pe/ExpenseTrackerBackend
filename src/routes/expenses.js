@@ -337,7 +337,34 @@ router.patch('/edit/:id', async (req, res) => {
       values.push(numAmount);
     }
 
+    if (date !== undefined) {
+      // accept 'YYYY-MM-DD' or ISO
+      const d = Date(date);
+      if (Number.isNaN(d.getTime())) {
+        return res.status(400).json({ message: 'Invalid date format'});
+      }
+      fields.push(`date = $${idx++}`);
+      values.push(d.toISOString());
+    }
+
+    if (user_id !== undefined) {
+      const uid = Number(user_id);
+      if (Number.isNaN(uid) || uid <= 0) {
+        return res.status(400).json({message: "Invalid user ID"});
+      }
+      fields.push(`user_id = $${idx++}`);
+      values.push(uid);
+    }
+
+    if (fields.length === 0 ) {
+      return res.status(400).json({message: 'No fields provided to update'});
+    }
+
+    // Add ID as a last parameter
+    values.push(expenseId);
+
     
+
 
 
   }catch(err){
