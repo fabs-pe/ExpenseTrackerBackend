@@ -363,11 +363,41 @@ router.patch('/edit/:id', async (req, res) => {
     // Add ID as a last parameter
     values.push(expenseId);
 
-    
+    const updateQuery =`
+      UPDATE expenses
+      SET ${fields.join(', ')}
+      WHERE id =$${idx}
+      RETURNING id, cat_id, expense_name, description, amount, date, user_id;
+    `;
 
+    const updateResult = await pool.query(updateQuery, values);
 
+    if (updateResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Expense not found' });
+    }
+
+    // Fetch with joins for response
+    const joinResult = await pool.query(
+      `
+      SELECT
+        e.id, e.cat_id, e.expense_name, e.description, e.amount, e.date, e.user_id,
+        c.category_name,
+        u.user_name, u.email
+      FROM expenses e
+      LEFT JOIN categories c ON e.cat_id = c.cat_id
+      LEFT JOIN users u ON e.user_id = u.id
+      WHERE e.id = $1
+      `, [expenseId]
+    );
+
+    res.json({
+      message: 'Expense updated',
+      expense: joinResult.rows[0],
+    });
 
   }catch(err){
+    console.error('PATCH expense error: ', err);
+    res.status(500).json({ error: err.message });
 
   }
   
