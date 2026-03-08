@@ -408,6 +408,44 @@ router.patch('/edit/:id', async (req, res) => {
 // DELETE an expenses
 // ==========================
 
+router.delete('/delete/:id', async (req, res) => {
+  try{
+    const { id } = req.params;
+    const expenseId = Number(id);
+
+    // vaildate ID
+    if (Number.isNaN(expenseId) || expenseId <= 0){
+      return res.status(400).json({ message: 'Invalid Expense ID '});
+    }
+
+    //  DELETE and return deleted row
+    const result = await pool.query(
+      `
+      DELETE FROM expenses
+      WHERE id = $1
+      RETURNING id, cat_id, expense_name, amount, date, user_id
+      
+      `, [expenseId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Expense Not Found'});
+    }
+
+    // success
+    return res.status(200).json({
+      message: 'Expense deleted',
+      deleted: result.rows[0],
+    })
+
+  } catch(err){
+    console.error('Delete expense error', err);
+    return res.status(500).json({ error: err.message})
+
+  }
+  
+});
+
 
 
 
