@@ -70,6 +70,38 @@ router.get('/:id', async (req, res) => {
 });
 
 // GET category by name
+router.get('/title/:category_name', async (req, res) => {
+    try{
+        const { category_name } = req.params;
+
+        const results = await pool.query(
+            `
+            SELECT c.*
+            FROM categories c
+            WHERE LOWER (c.category_name) = LOWER ($1)
+            `, [category_name]
+        );
+
+        if (results.rowCount.length === 0 ){
+            return results.status(404).json({message: 'Category Not Found'})
+        }
+
+        res.json({
+            message: 'Category Found',
+            Category: results.rows
+        })
+
+    }catch(err){
+        console.error('GET Category Error:', err);
+        res.status(500).json({ error: err.message})
+
+    }
+    
+});
+
+// ||||||||||||||||||||||
+//  POST ENDPOINT
+// ||||||||||||||||||||||
 
 
 module.exports = router;
