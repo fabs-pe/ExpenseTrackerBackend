@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { Pool } = require('pg');
 const bcrypt = require('bcrypt'); 
+const SALT_ROUNDS = 10;
 
 //  CREATE POOL HERE
 const pool = new Pool({
@@ -42,7 +43,7 @@ router.get('/:id', async (req, res) => {
     const { id } = req.params;
 
     if (isNaN(id) || id<=0){
-      return res.status(400).json({message: 'Inavalid User ID '});
+      return res.status(400).json({message: 'Invalid User ID '});
     }
 
     const results = await pool.query(`
@@ -126,10 +127,38 @@ router.get('/group/:group_name', async (req, res) => {
 
 // // GET user by email
 // // add permissions
-// router.get('/:email', async (req, res) => {
-//     try{
+router.get('/email/:email', async (req, res) => {
+    try{
+      const { email } = req.params;
 
-// })
+      if (!email || typeof email != 'string') {
+        return res.status(400).json({message: 'Email is required'});
+      }
+
+      const result = await pool.query(
+        `
+        SELECT id, user_name, email, group_name, role
+        FROM users
+        WHERE email = $1
+        `, [email]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: 'User not found'});
+      }
+
+      res.json({
+        message: 'User found',
+        user: result.rows[0],
+      });
+
+    }catch(err){
+      console.error('GET suer by email error: ', err);
+      res.status(500).json({ error: err.message})
+
+    }
+
+});
 
 
 // ||||||||||||||||||||||
@@ -238,6 +267,137 @@ router.post('/login', async (req, res) => {
     });
 
   }
+});
+
+// ==========================
+// PATCH a user
+// ==========================
+
+router.patch('/edit/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { user_name, email, password, group_name, role } = req.body;
+
+    const userId = Number(id);
+    if (Number.isNaN(userId) || userId <= 0 ){
+      return res.status(400).json({ message: 'Invalid User ID'})
+    }
+
+    // build dynamic SET based on provided fields
+    const fields = [];
+    const values = [];
+    let idx = 1;
+
+    if (user_name !== undefined){
+      fields.push(`user_name = $${idx++}`);
+      values.push(user_name);
+    }
+
+    if (email !== undefined){
+      fields.push(`email = $${idx++}`);
+      values.push(email);
+    }
+
+    if (password !== undefined){
+      const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+      fields.push(`password = $${idx++}`);
+      values.push(hashedPassword);
+    }
+
+    if (group_name !== undefined){
+      fields.push( `group_name = $${idx++}`);
+      values.push(group_name);
+    }
+
+    if (role !== undefined){
+      fields.push(`role = $${idx++}`);
+      values.push(role);
+    }
+
+    if (fields.length === 0 ){
+      return res.status(400).json({message: 'No fields provided to update'})
+    }
+
+    // add ID as a last parameter
+    values.push(userId);
+
+    const updateQuery = 
+    `
+      UPDATE users
+      SET ${fields.join(', ')}
+      WHERE id =$${idx}
+      RETURNING user_name, email, password, group_name, role;
+    `;
+
+    const updateResult = await pool.query(updateQuery, values);
+
+    if (updateResult.rows.length === 0){
+      return res.status(404).json({message: 'User not found'});
+    }
+
+    // Fetch response
+    const joinResult = await pool.query(
+      `
+      SELECT
+      user_name, email, password, group_name, role
+      FROM users
+      WHERE id = $1
+      `, [userId]
+    );
+
+    res.json({
+      message: "User Updated",
+      user: joinResult.rows[0]
+    });
+
+  }catch(err){
+    console.error('PATCH user error: ', err);
+    res.status(500).json({ error: err.message});
+
+  }
+  
+})
+
+// ==========================
+// DELETE an users
+// ==========================
+
+router.delete('/delete/:id', async (req, res) => {
+  try{
+    const { id } = req.params;
+    const userId = Number(id);
+
+    // vaildate ID
+    if (Number.isNaN(userId) || userId <= 0 ){
+      return res.status(400).json({message: 'Invalid User Id'})
+    };
+
+    // DELETE and return deleted rows
+    const result = await pool.query(
+      `
+      
+      DELETE from users
+      WHERE id = $1
+      RETURNING user_name, email, group_name, role
+
+      `, [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({message: 'User Not Found'})
+    }
+
+    return res.status(200).json({
+      message: 'User Deleted',
+      deleted: result.rows[0],
+    });
+
+  }catch(err){
+    console.error('Delted User Error:', err);
+    return res.status(500).json({ error: err.message})
+
+  };
+  
 });
 
 
