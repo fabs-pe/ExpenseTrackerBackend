@@ -21,7 +21,11 @@ app.use("/users", UserController);
 
 // expense route
 const ExpenseController = require('./routes/expenses');
-app.use("/expenses", ExpenseController)
+app.use("/expenses", ExpenseController);
+
+// category route
+const CatController = require('./routes/category');
+app.use("/category", CatController);
 
 // 404 route
 app.get('*', (req, res) => {
