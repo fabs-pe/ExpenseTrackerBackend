@@ -153,7 +153,7 @@ router.get('/email/:email', async (req, res) => {
       });
 
     }catch(err){
-      console.error('GET suer by email error: ', err);
+      console.error('GET user by email error: ', err);
       res.status(500).json({ error: err.message})
 
     }
@@ -182,7 +182,7 @@ router.post("/register", async (req, res) =>{
         'SELECT id FROM users WHERE email = $1', [email]
       );
       if (existing.rows.length > 0) {
-        return res.status(409).json({ message: 'Email already registered'})
+        return res.status(400).json({ message: 'Email already registered'})
       }
 
       // Hash password

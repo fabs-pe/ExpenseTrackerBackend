@@ -103,5 +103,64 @@ router.get('/title/:category_name', async (req, res) => {
 //  POST ENDPOINT
 // ||||||||||||||||||||||
 
+// POST create a new category
+router.post('/create', async (req, res) => {
+    try{
+        const { category_name, category_desc } = req.body;
+
+        // validation
+        if(!category_name || !category_desc){
+            return res.status(400).json({
+                message: 'Category name and description are required'
+            })
+        }
+
+        // check if categpry name exists
+        const existing = await pool.query(
+            'SELECT cat_id FROM categories WHERE category_name = $1', [category_name]
+        );
+        if (existing.rows.length > 0){
+            return res.status(400).json({ message: 'Category name already exists'})
+        }
+
+        // insert data
+        const insertText = `
+            INSERT INTO categories (created_at, category_name, category_desc)
+            VALUES (NOW(), $1, $2)
+            RETURNING cat_id, created_at, category_name, category_desc;
+        `;
+
+        const values = [
+            category_name,
+            category_desc,
+        ];
+
+        const result = await pool.query(insertText, values);
+        const category = result.rows[0];
+
+        return res.status(201).json({
+            message: "Category Created",
+            category,
+        });
+
+
+    } catch(err){
+        console.error('Create category error');
+        res.status(500).json({ error: err.message})
+    }
+})
+
+
+// ||||||||||||||||||||||
+//  PATCH ENDPOINT
+// ||||||||||||||||||||||
+
+
+
+
+// ||||||||||||||||||||||
+//  DELETE ENDPOINT
+// ||||||||||||||||||||||
+
 
 module.exports = router;
